@@ -1,0 +1,61 @@
+## Playbook: tcb-playbook.yml
+
+---
+- name: TCB Bootcamp DevOps Cloud - AWS ~ IAM 
+  hosts: localhost 
+  tasks:
+    - name: Ler e Armazenar dados do Arquivo CSV
+      community.general.read_csv:
+        path: usuarios.csv
+      register: dadosCSV
+
+    - name: Listar a variável 'dadosCSV'
+      debug:
+        msg: "{{ dadosCSV }}"
+
+    - name: Criar Política Customizada para Forçar o uso do MFA
+      community.aws.iam_managed_policy:
+        policy_name: EnforceMFAPolicy
+        policy: "{{ lookup('file', 'enforce-mfa-policy.json') }}"
+        state: present        
+      register: politicaMfaCriada
+
+    - name: Listar a variável 'politicaMfaCriada'
+      debug:
+        msg: "{{ politicaMfaCriada }}"
+
+    - name: Criar Grupos
+      community.aws.iam_group:
+        name: "{{ item.name }}"
+        managed_policies:
+          - "{{ item.policy }}"
+          - "{{ politicaMfaCriada.policy.arn }}"
+        state: present        
+      with_items:
+        - { name: CloudAdmin, policy: arn:aws:iam::aws:policy/AdministratorAccess }
+        - { name: LinuxAdmin, policy: arn:aws:iam::aws:policy/AmazonEC2FullAccess }
+        - { name: RedesAdmin, policy: arn:aws:iam::aws:policy/AmazonVPCFullAccess }
+        - { name: DBA, policy: arn:aws:iam::aws:policy/AmazonRDSFullAccess }
+        - { name: Estagiarios, policy: arn:aws:iam::aws:policy/ReadOnlyAccess }
+      register: gruposCriados
+
+    - name: Listar a variável 'gruposCriados'
+      debug:
+        msg: "{{ gruposCriados }}"
+
+    - name: Criar Usuários com base na Lista do CSV
+      community.aws.iam_user:
+        name: "{{ item.usuario }}"
+        password: "{{ item.senha }}"
+        password_reset_required: true
+        update_password: on_create
+        state: present
+      loop: "{{ dadosCSV.list }}"
+
+    - name: Adicionar Usuários aos Grupos
+      community.aws.iam_group:
+        name: "{{ item.grupo }}"
+        users:
+          - "{{ item.usuario }}"
+        state: present
+      loop: "{{ dadosCSV.list }}"

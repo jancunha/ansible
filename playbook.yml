@@ -1,0 +1,18 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: Creates directory
+      file: path=/home/joao/test state=directory
+    
+    - name: Update apt-cache
+      apt: update_cache=yes
+
+    - name: Install packages
+      apt:
+        name:
+        - ntpdate
+        - nmap
+        state: latest
+        cache_valid_time: 3600
+  
