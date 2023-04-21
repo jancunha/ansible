@@ -96,6 +96,12 @@
         name: jenkins
         state: latest
 
+    - name: Add the user 'ubuntu' to group 'docker'
+      ansible.builtin.user:
+        name: jenkins
+        groups: docker
+        append: yes
+
   handlers:
     - name: restart docker
       service:
@@ -106,4 +112,4 @@
       service:
         name: jenkins
         enabled: true
-        state: started
+        state: restarted

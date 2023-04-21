@@ -1,7 +1,8 @@
 [all]
-54.209.212.188
+198.199.88.220
 [all:vars]
-ansible_ssh_private_key_file=~/.keys/ssh-key.pem
+ansible_ssh_private_key_file=~/.ssh/ufokey
+#ansible_ssh_private_key_file=~/.keys/ssh-key.pem
 
 #[server]
-#54.209.212.188
+#198.199.88.220
