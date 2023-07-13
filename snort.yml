@@ -1,0 +1,24 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: Updating OS
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: yes
+
+    - name: Install packages
+      ansible.builtin.apt:
+        name: "{{ item }}"
+        state: latest
+      loop:
+        - vim
+        - snort
+
+    - name: Install Rules
+      block:
+        - name: Unarchive a file that needs to be downloaded (added in 2.0)
+          ansible.builtin.unarchive:
+            src: https://www.snort.org/rules/snortrules-snapshot-2983.tar.gz?oinkcode=88cbf6d3d2b4327fe78fc6f08fed8e9e888dd027
+            dest: /etc/snort/rules/
+            remote_src: yes

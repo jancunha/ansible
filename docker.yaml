@@ -1,0 +1,55 @@
+- hosts: all
+  become: true
+  tasks:
+    - name: Updating OS
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: yes
+
+    - name: Install packages
+      ansible.builtin.apt:
+        name: "{{ item }}"
+        state: latest
+      loop:
+        - vim
+        - unzip
+
+    - name: Install Docker requirements
+      block:
+        - name: Add Key
+          ansible.builtin.apt_key:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            state: present
+
+        - name: Add repository
+          ansible.builtin.apt_repository:
+            repo: deb https://download.docker.com/linux/ubuntu jammy stable
+            state: present
+
+    - name: Update apt-cache
+      ansible.builtin.apt:
+        update_cache: true
+        state: latest
+
+    - name: Install Docker
+      ansible.builtin.apt:
+        name: "{{item}}"
+        state: latest
+      loop:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+        - docker-buildx-plugin
+        - docker-compose-plugin
+
+    - name: Add the user 'ubuntu' to group 'docker'
+      ansible.builtin.user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+  handlers:
+    - name: Restart docker
+      service:
+        name: docker
+        state: restarted
