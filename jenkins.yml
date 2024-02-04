@@ -22,10 +22,11 @@
         - apt-transport-https
         - gnupg
         - unzip
+        - fontconfig
 
     - name: Install Java
       ansible.builtin.apt:
-        name: openjdk-17-jdk
+        name: openjdk-17-jre
         state: present
 
     - name: Install Docker requirements
