@@ -1,5 +1,7 @@
 - hosts: all
   become: true
+  vars:
+    usuario_alvo: "sysadmin"
   tasks:
     - name: Updating OS
       ansible.builtin.apt:
@@ -12,7 +14,10 @@
         state: latest
       loop:
         - vim
-        - unzip
+        - git
+        - ca-certificates
+        - curl
+        - zsh
 
     - name: Install Docker requirements
       block:
@@ -23,7 +28,7 @@
 
         - name: Add repository
           ansible.builtin.apt_repository:
-            repo: deb https://download.docker.com/linux/ubuntu jammy stable
+            repo: deb https://download.docker.com/linux/ubuntu noble stable
             state: present
 
     - name: Update apt-cache
@@ -42,12 +47,123 @@
         - docker-buildx-plugin
         - docker-compose-plugin
 
-    - name: Add the user 'ubuntu' to group 'docker'
+    - name: Add the user 'sysadmin' to group 'docker'
       ansible.builtin.user:
-        name: ubuntu
+        name: sysadmin
         groups: docker
         append: yes
 
+    - name: Definir ZSH como shell padrão para o usuário
+      user:
+        name: "{{ usuario_alvo }}"
+        shell: /bin/zsh
+
+    - name: Instalar Oh My Zsh
+      shell: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+      args:
+        creates: "/home/{{ usuario_alvo }}/.oh-my-zsh"
+      become_user: "{{ usuario_alvo }}"
+    
+    - name: Instalar plugin zsh-syntax-highlighting
+      git:
+        repo: https://github.com/zsh-users/zsh-syntax-highlighting.git
+        dest: "/home/{{ usuario_alvo }}/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting"
+      become_user: "{{ usuario_alvo }}"
+    
+    - name: Instalar plugin zsh-autosuggestions
+      git:
+        repo: https://github.com/zsh-users/zsh-autosuggestions.git
+        dest: "/home/{{ usuario_alvo }}/.oh-my-zsh/custom/plugins/zsh-autosuggestions"
+      become_user: "{{ usuario_alvo }}"
+    
+    - name: Instalar plugin zsh-completions
+      git:
+        repo: https://github.com/zsh-users/zsh-completions.git
+        dest: "/home/{{ usuario_alvo }}/.oh-my-zsh/custom/plugins/zsh-completions"
+      become_user: "{{ usuario_alvo }}"
+      
+    - name: Verificar se os plugins já estão em .zshrc
+      shell: grep -q "plugins=(" "/home/{{ usuario_alvo }}/.zshrc"
+      register: plugins_line_exists
+      changed_when: false
+      failed_when: false
+      become_user: "{{ usuario_alvo }}"
+      
+    - name: Atualizar plugins no .zshrc
+      lineinfile:
+        path: "/home/{{ usuario_alvo }}/.zshrc"
+        regexp: '^plugins=\(.*\)'
+        line: "plugins=(git zsh-syntax-highlighting zsh-autosuggestions zsh-completions)"
+      when: plugins_line_exists.rc == 0
+      become_user: "{{ usuario_alvo }}"
+      
+    - name: Adicionar configuração para zsh-completions se necessário
+      lineinfile:
+        path: "/home/{{ usuario_alvo }}/.zshrc"
+        line: "autoload -U compinit && compinit"
+        insertafter: "^plugins=\\("
+      become_user: "{{ usuario_alvo }}"
+
+    - name: Atualizar cache de pacotes e instalar dependências
+      apt:
+        update_cache: yes
+        name:
+          - gnupg
+          - software-properties-common
+          - curl
+          - wget
+        state: present
+      
+    - name: Install Terraform requirements
+      block:
+        - name: Add Key
+          ansible.builtin.apt_key:
+            url: https://apt.releases.hashicorp.com/gpg
+            state: present
+
+        - name: Add repository
+          ansible.builtin.apt_repository:
+            repo: deb https://apt.releases.hashicorp.com noble main
+            state: present
+    
+    - name: Atualizar o cache de pacotes após adição do repositório
+      apt:
+        update_cache: yes
+    
+    - name: Instalar Terraform
+      apt:
+        name: terraform
+        state: latest
+
+    # - name: Instalar autocomplete do Terraform
+    #   shell: terraform -install-autocomplete
+    #   become_user: "{{ usuario_alvo }}"
+      # args:
+      #   creates: "/home/{{ usuario_alvo }}/.terraform.d/autocomplete"
+      # environment:
+      #   SHELL: /bin/zsh
+
+    - name: Install Kubectl requirements
+      block:
+        - name: Add Key
+          ansible.builtin.apt_key:
+            url: https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key
+            state: present
+
+        - name: Add repository
+          ansible.builtin.apt_repository:
+            repo: deb https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /
+            state: present
+
+    - name: Atualizar o cache de pacotes após adição do repositório
+      apt:
+        update_cache: yes
+
+    - name: Instalar kubectl
+      apt:
+        name: kubectl
+        state: latest
+  
   handlers:
     - name: Restart docker
       service:
