@@ -238,3 +238,34 @@
         ansible.builtin.apt:
           name: ansible
           state: present
+        
+  - name: Seção de instalação do AWS cli # Módulo 7 AWS
+    block:
+      - name: Baixar o AWS CLI
+        get_url:
+          url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+          dest: "/tmp/awscliv2.zip"
+
+      - name: Instalar unzip se não estiver presente
+        apt:
+          name: unzip
+          state: present
+
+      - name: Extrair o AWS CLI
+        unarchive:
+          src: "/tmp/awscliv2.zip"
+          dest: "/tmp/"
+          remote_src: yes
+
+      - name: Instalar o AWS CLI
+        command: sudo /tmp/aws/install
+
+      - name: Remover arquivos temporários
+        file:
+          path: "/tmp/awscliv2.zip"
+          state: absent
+
+      - name: Remover diretório de instalação temporário
+        file:
+          path: "/tmp/aws"
+          state: absent
