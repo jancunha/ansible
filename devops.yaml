@@ -1,0 +1,243 @@
+- hosts: all
+  become: true
+  vars:
+    usuario_alvo: "sysadmin"
+    versao: "noble"
+    ansible_architecture: "amd64"
+  tasks:
+  - name: Atualizando o SO # Módulo 0 SO
+    ansible.builtin.apt:
+      update_cache: true
+      upgrade: yes
+
+  - name: Instalando os pacotes necessários
+    apt:
+      name: "{{ item }}"
+      state: latest
+    loop:
+      - vim
+      - git
+      - curl
+      - unzip
+      - net-tools
+      - zsh
+
+  - name: Seção de instalação do ZSH e Oh My Zsh # Módulo 1 ZSH
+    block:
+      - name: Definir ZSH como shell padrão para o usuário
+        user:
+          name: "{{ usuario_alvo }}"
+          shell: /bin/zsh
+
+      - name: Instalar Oh My Zsh
+        shell: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+        args:
+          creates: "/home/{{ usuario_alvo }}/.oh-my-zsh"
+        become_user: "{{ usuario_alvo }}"
+      
+      - name: Instalar plugin zsh-syntax-highlighting
+        git:
+          repo: https://github.com/zsh-users/zsh-syntax-highlighting.git
+          dest: "/home/{{ usuario_alvo }}/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting"
+        become_user: "{{ usuario_alvo }}"
+      
+      - name: Instalar plugin zsh-autosuggestions
+        git:
+          repo: https://github.com/zsh-users/zsh-autosuggestions.git
+          dest: "/home/{{ usuario_alvo }}/.oh-my-zsh/custom/plugins/zsh-autosuggestions"
+        become_user: "{{ usuario_alvo }}"
+      
+      - name: Instalar plugin zsh-completions
+        git:
+          repo: https://github.com/zsh-users/zsh-completions.git
+          dest: "/home/{{ usuario_alvo }}/.oh-my-zsh/custom/plugins/zsh-completions"
+        become_user: "{{ usuario_alvo }}"
+        
+      - name: Verificar se os plugins já estão em .zshrc
+        shell: grep -q "plugins=(" "/home/{{ usuario_alvo }}/.zshrc"
+        register: plugins_line_exists
+        changed_when: false
+        failed_when: false
+        become_user: "{{ usuario_alvo }}"
+        
+      - name: Atualizar plugins no .zshrc
+        lineinfile:
+          path: "/home/{{ usuario_alvo }}/.zshrc"
+          regexp: '^plugins=\(.*\)'
+          line: "plugins=(git zsh-syntax-highlighting zsh-autosuggestions zsh-completions)"
+        when: plugins_line_exists.rc == 0
+        become_user: "{{ usuario_alvo }}"
+        
+      - name: Adicionar configuração para zsh-completions se necessário
+        lineinfile:
+          path: "/home/{{ usuario_alvo }}/.zshrc"
+          line: "autoload -U compinit && compinit"
+          insertafter: "^plugins=\\("
+        become_user: "{{ usuario_alvo }}"
+  
+  - name: Seção de instalação do Docker # Módulo 2 Docker
+    block:
+      - name: Atualizar cache de pacotes e instalar dependências
+        ansible.builtin.apt:
+          name: "{{ item }}"
+          state: latest
+        loop:
+          - ca-certificates
+          - curl
+
+      - name: Baixar e instalar chave GPG do Docker
+        get_url:
+          url: https://download.docker.com/linux/ubuntu/gpg
+          dest: /etc/apt/keyrings/docker.asc
+          mode: '0644'
+
+      - name: Adicionar repositório Docker
+        copy:
+          dest: /etc/apt/sources.list.d/docker.list
+          content: |
+            deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ versao }} stable
+
+      - name: Atualizar o cache de pacotes após adição do repositório
+        apt:
+          update_cache: yes
+
+      - name: Instalando os pacotes do Docker
+        apt:
+          name:
+            - docker-ce
+            - docker-ce-cli
+            - containerd.io
+            - docker-buildx-plugin
+            - docker-compose-plugin
+          state: present
+      
+      - name: Habilitar e iniciar o serviço Docker
+        systemd:
+          name: docker
+          enabled: yes
+          state: started
+
+      - name: Adicionando o usuário ao grupo 'docker'
+        user:
+          name: "{{ usuario_alvo }}"
+          groups: docker
+          append: yes
+
+  - name: Seção de instalação do Terraform # Módulo 3 Terraform
+    block:
+      - name: Atualizar cache de pacotes e instalar dependências
+        apt:
+          update_cache: yes
+          name:
+            - gnupg
+            - software-properties-common
+            - curl
+            - wget
+          state: latest
+        
+      - name: Baixar e instalar chave GPG do HashiCorp
+        apt_key:
+              url: https://apt.releases.hashicorp.com/gpg
+              keyring: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+      - name: Adicionar repositório HashiCorp
+        apt_repository:
+          repo: "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com {{ versao }} main"
+          state: present
+          filename: hashicorp
+      
+      - name: Atualizar o cache de pacotes após adição do repositório
+        apt:
+          update_cache: yes
+      
+      - name: Instalar Terraform
+        apt:
+          name: terraform
+          state: latest
+
+  - name: Seção de instalação do Kubectl # Módulo 4 Kubectl
+    block:
+      - name: Atualizar cache de pacotes e instalar dependências
+        apt:
+          update_cache: yes
+          name:
+            - apt-transport-https
+            - ca-certificates
+            - curl
+            - gnupg
+          state: latest
+
+      - name: Baixar e instalar chave GPG do Kubernetes
+        apt_key:
+          url: https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key
+          keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+      - name: Adicionar repositório Kubernetes
+        apt_repository:
+          repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /"
+          state: present
+
+      - name: Atualizar o cache de pacotes após adição do repositório
+        apt:
+          update_cache: yes
+
+      - name: Instalar kubectl
+        apt:
+          name: kubectl
+          state: latest
+
+  - name: Seção de instalação do Helm # Módulo 5 Helm
+    block:
+      - name: Adicionar chave GPG do repositório Helm
+        ansible.builtin.shell: |
+          curl -fsSL https://baltocdn.com/helm/signing.asc | gpg --dearmor -o /usr/share/keyrings/helm.gpg
+        args:
+          creates: /usr/share/keyrings/helm.gpg
+
+      - name: Instalar apt-transport-https
+        ansible.builtin.apt:
+          name: apt-transport-https
+          state: present
+
+      - name: Adicionar repositório do Helm
+        ansible.builtin.copy:
+          dest: /etc/apt/sources.list.d/helm-stable-debian.list
+          content: "deb [arch={{ ansible_architecture }} signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main"
+          mode: '0644'
+
+      - name: Atualizar pacotes
+        ansible.builtin.apt:
+          update_cache: yes
+
+      - name: Instalar Helm
+        ansible.builtin.apt:
+          name: helm
+          state: present
+
+  - name: Seção de instalação do Helm # Módulo 6 Ansible
+    block:
+      - name: Atualizar lista de pacotes
+        ansible.builtin.apt:
+          update_cache: yes
+
+      - name: Instalar dependências necessárias
+        ansible.builtin.apt:
+          name:
+            - software-properties-common
+            - python3
+            - python3-pip
+          state: present
+
+      - name: Adicionar repositório do Ansible
+        ansible.builtin.apt_repository:
+          repo: ppa:ansible/ansible
+          state: present
+
+      - name: Atualizar lista de pacotes novamente
+        ansible.builtin.apt:
+          update_cache: yes
+
+      - name: Instalar Ansible
+        ansible.builtin.apt:
+          name: ansible
+          state: present
