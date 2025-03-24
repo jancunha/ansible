@@ -21,6 +21,8 @@
       - unzip
       - net-tools
       - zsh
+      - python3
+      - python3-pip
 
   - name: Seção de instalação do ZSH e Oh My Zsh # Módulo 1 ZSH
     block:
@@ -216,24 +218,19 @@
 
   - name: Seção de instalação do Helm # Módulo 6 Ansible
     block:
-      - name: Atualizar lista de pacotes
-        ansible.builtin.apt:
-          update_cache: yes
-
-      - name: Instalar dependências necessárias
-        ansible.builtin.apt:
-          name:
-            - software-properties-common
-            - python3
-            - python3-pip
+      - name: Adicionar chave do repositório Ansible
+        ansible.builtin.apt_key:
+          url: "https://keyserver.ubuntu.com/pks/lookup?fingerprint=on&op=get&search=0x6125E2A8C77F2818FB7BD15B93C4A3FD7BB9C367"
+          keyring: "/usr/share/keyrings/ansible-archive-keyring.gpg"
           state: present
 
       - name: Adicionar repositório do Ansible
         ansible.builtin.apt_repository:
-          repo: ppa:ansible/ansible
+          repo: "deb [signed-by=/usr/share/keyrings/ansible-archive-keyring.gpg] http://ppa.launchpad.net/ansible/ansible/ubuntu noble main"
+          filename: "ansible"
           state: present
 
-      - name: Atualizar lista de pacotes novamente
+      - name: Atualizar lista de pacotes
         ansible.builtin.apt:
           update_cache: yes
 
