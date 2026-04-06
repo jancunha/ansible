@@ -190,22 +190,24 @@
 
   - name: Seção de instalação do Helm # Módulo 5 Helm
     block:
-      - name: Adicionar chave GPG do repositório Helm
-        ansible.builtin.shell: |
-          curl -fsSL https://baltocdn.com/helm/signing.asc | gpg --dearmor -o /usr/share/keyrings/helm.gpg
-        args:
-          creates: /usr/share/keyrings/helm.gpg
-
-      - name: Instalar apt-transport-https
+      - name: Instalando Dependências para o Helm
         ansible.builtin.apt:
-          name: apt-transport-https
+          name: 
+            - apt-transport-https
+            - gpg
           state: present
 
-      - name: Adicionar repositório do Helm
-        ansible.builtin.copy:
-          dest: /etc/apt/sources.list.d/helm-stable-debian.list
-          content: "deb [arch={{ ansible_architecture }} signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main"
+      - name: Baixar chave GPG do Helm
+        ansible.builtin.get_url:
+          url: https://packages.buildkite.com/helm-linux/helm-debian/gpgkey
+          dest: /etc/apt/keyrings/helm.asc
           mode: '0644'
+
+      - name: Adicionar repositório Helm
+        ansible.builtin.apt_repository:
+          repo: "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/helm.asc] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main"
+          state: present
+          filename: helm-stable-debian
 
       - name: Atualizar pacotes
         ansible.builtin.apt:
@@ -216,7 +218,7 @@
           name: helm
           state: present
 
-  - name: Seção de instalação do Helm # Módulo 6 Ansible
+  - name: Seção de instalação do Ansible # Módulo 6 Ansible
     block:
       - name: Adicionar chave do repositório Ansible
         ansible.builtin.apt_key:
