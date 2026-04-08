@@ -11,7 +11,7 @@
       upgrade: yes
 
   - name: Instalando os pacotes necessários
-    apt:
+    ansible.builtin.apt:
       name: "{{ item }}"
       state: latest
     loop:
