@@ -95,7 +95,7 @@
 
       - name: Adicionar repositório Docker
         copy:
-          dest: /etc/apt/sources.list.d/docker.list
+          dest: /etc/apt/sources.list.d/docker.sources
           content: |
             deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ versao }} stable
 
@@ -171,12 +171,12 @@
 
       - name: Baixar e instalar chave GPG do Kubernetes
         apt_key:
-          url: https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key
+          url: https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key
           keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
       - name: Adicionar repositório Kubernetes
         apt_repository:
-          repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /"
+          repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /"
           state: present
 
       - name: Atualizar o cache de pacotes após adição do repositório
