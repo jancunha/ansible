@@ -95,7 +95,7 @@
 
       - name: Adicionar repositório Docker
         copy:
-          dest: /etc/apt/sources.list.d/docker.sources
+          dest: /etc/apt/sources.list.d/docker.list
           content: |
             deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ versao }} stable
 
